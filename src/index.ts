@@ -51,8 +51,8 @@ server.tool(
 			.default(250)
 			.describe('number of invoices to retrieve per page'),
 	},
-	async ({ status }) => {
-		const voucherlistUrl = `/v1/voucherlist?voucherType=invoice&voucherStatus=${status.join(',')}`;
+	async ({ status, page, size }) => {
+		const voucherlistUrl = `/v1/voucherlist?voucherType=invoice&voucherStatus=${status.join(',')}&page=${page}&size=${size}`;
 		const voucherlistData = await makeLexwareOfficeRequest<any>(voucherlistUrl);
 		const vouchers = voucherlistData.content;
 
@@ -164,13 +164,15 @@ server.tool(
 			.default(250)
 			.describe('number of contacts to retrieve per page'),
 	},
-	async ({ email, name, number, customer, vendor }) => {
+	async ({ email, name, number, customer, vendor, page, size }) => {
 		const params = new URLSearchParams();
 		if (email) params.append('email', email);
 		if (name) params.append('name', name);
 		if (number) params.append('number', number.toString());
 		if (customer !== undefined) params.append('customer', customer.toString());
 		if (vendor !== undefined) params.append('vendor', vendor.toString());
+		params.append('page', page.toString());
+		params.append('size', size.toString());
 
 		const contactsUrl = `/v1/contacts?${params.toString()}`;
 		const contactsData = await makeLexwareOfficeRequest<any>(contactsUrl);
@@ -455,30 +457,14 @@ server.tool(
 		id: z.string().uuid().describe('The ID of the invoice or voucher to retrieve payment information for'),
 	},
 	async ({ id }) => {
-		const LEXOFFICE_API_BASE = 'https://api.lexoffice.io';
-		const LEXWARE_OFFICE_API_KEY = process.env.LEXWARE_OFFICE_API_KEY!;
-		const response = await fetch(`${LEXOFFICE_API_BASE}/v1/payments/${id}`, {
-			headers: {
-				Accept: 'application/json',
-				Authorization: `Bearer ${LEXWARE_OFFICE_API_KEY}`,
-			},
-		}).catch(() => null);
+		const data = await makeLexwareOfficeRequest<any>(`/v1/payments/${id}`);
 
-		if (!response) {
-			return { content: [{ type: 'text', text: 'Network error retrieving payment information' }] };
-		}
-
-		let body: unknown;
-		try { body = await response.json(); } catch { body = null; }
-
-		if (!response.ok) {
-			return {
-				content: [{ type: 'text', text: `API error ${response.status}: ${JSON.stringify(body)}` }],
-			};
+		if (!data) {
+			return { content: [{ type: 'text', text: 'Failed to retrieve payment information' }] };
 		}
 
 		return {
-			content: [{ type: 'text', text: `Payment information:\n\n${JSON.stringify(body, null, 2)}` }],
+			content: [{ type: 'text', text: `Payment information:\n\n${JSON.stringify(data, null, 2)}` }],
 		};
 	},
 );

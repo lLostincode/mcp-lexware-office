@@ -165,6 +165,39 @@ Visit [https://app.lexoffice.de/addons/public-api](https://app.lexoffice.de/addo
 
 - Node.js 22 or higher
 
+### API Key Modes
+
+The server supports two modes for providing the API key:
+
+#### Mode 1 — `.env` file (recommended for local development)
+
+Create a `.env` file in the project root:
+
+```env
+LEXWARE_OFFICE_API_KEY=your_api_key_here
+```
+
+The server automatically loads it on startup using [`dotenv`](https://github.com/motdotla/dotenv).
+
+#### Mode 2 — Environment variable or per-request (recommended for production / middleware)
+
+Set the environment variable directly:
+
+```bash
+export LEXWARE_OFFICE_API_KEY=your_api_key_here
+```
+
+Or pass the key explicitly to any request helper when using the package programmatically:
+
+```typescript
+import { makeLexwareOfficeRequest } from 'mcp-lexware-office';
+
+// Provide key at request time (takes precedence over .env / env var)
+const data = await makeLexwareOfficeRequest('/v1/invoices', apiKey);
+```
+
+**Resolution priority:** explicit `apiKey` parameter → `process.env.LEXWARE_OFFICE_API_KEY` (from `.env` or shell) → error logged, request returns `null`.
+
 ### Usage with Claude Desktop
 
 Add this to your `claude_desktop_config.json`:

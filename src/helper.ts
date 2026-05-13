@@ -1,25 +1,55 @@
+import { config as loadEnv } from 'dotenv';
 import { logger } from './logger.js';
 
-const LEXWARE_OFFICE_API_KEY = process.env.LEXWARE_OFFICE_API_KEY!;
-if (!LEXWARE_OFFICE_API_KEY) {
-	logger.error('Error: LEXWARE_OFFICE_API_KEY environment variable is required');
-	process.exit(1);
-}
+// ---------------------------------------------------------------------------
+// Dual-mode API key loading
+// ---------------------------------------------------------------------------
+// Mode 1 — .env file:
+//   Create a .env file in the project root with:
+//   LEXWARE_OFFICE_API_KEY=your_api_key_here
+//   dotenv loads it automatically on startup.
+//
+// Mode 2 — Per-request (runtime override):
+//   Pass an `apiKey` argument directly to any request helper.
+//   This takes precedence over the env var and is useful when the key is
+//   injected by middleware (e.g. from an HTTP header or request state).
+// ---------------------------------------------------------------------------
+loadEnv();
 
 const LEXOFFICE_API_BASE = 'https://api.lexoffice.io';
 const USER_AGENT = 'mcp-lexware-office/0.3.0';
 
-export async function makeLexwareOfficeRequest<T>(path: string): Promise<T | null> {
+function resolveApiKey(provided?: string): string | null {
+	if (provided) {
+		return provided;
+	}
+	const key = process.env.LEXWARE_OFFICE_API_KEY;
+	if (!key) {
+		logger.error(
+			'LEXWARE_OFFICE_API_KEY is not set. ' +
+			'Either create a .env file or pass the key explicitly via the apiKey parameter.',
+		);
+	}
+	return key || null;
+}
+
+export async function makeLexwareOfficeRequest<T>(
+	path: string,
+	apiKey?: string,
+): Promise<T | null> {
+	const key = resolveApiKey(apiKey);
+	if (!key) {
+		return null;
+	}
+
 	const url = `${LEXOFFICE_API_BASE}${path}`;
 	const headers = {
 		'User-Agent': USER_AGENT,
 		Accept: 'application/json',
-		Authorization: `Bearer ${LEXWARE_OFFICE_API_KEY}`,
+		Authorization: `Bearer ${key}`,
 	};
 
-	logger.log('Making Lexware Office request', {
-		url,
-	});
+	logger.log('Making Lexware Office request', { url });
 
 	try {
 		const response = await fetch(url, { headers });
@@ -38,12 +68,18 @@ export async function makeLexwareOfficeRequest<T>(path: string): Promise<T | nul
 export async function makeLexwareOfficeFileRequest(
 	path: string,
 	accept: 'application/pdf' | 'application/xml',
+	apiKey?: string,
 ): Promise<{ data: Buffer; mimeType: string } | null> {
+	const key = resolveApiKey(apiKey);
+	if (!key) {
+		return null;
+	}
+
 	const url = `${LEXOFFICE_API_BASE}${path}`;
 	const headers = {
 		'User-Agent': USER_AGENT,
 		Accept: accept,
-		Authorization: `Bearer ${LEXWARE_OFFICE_API_KEY}`,
+		Authorization: `Bearer ${key}`,
 	};
 
 	logger.log('Making Lexware Office file request', { url });
@@ -73,13 +109,19 @@ export async function makeLexwareOfficeWriteRequest<T>(
 	path: string,
 	method: 'POST' | 'PUT' | 'DELETE',
 	body?: unknown,
+	apiKey?: string,
 ): Promise<WriteResult<T> | null> {
+	const key = resolveApiKey(apiKey);
+	if (!key) {
+		return null;
+	}
+
 	const url = `${LEXOFFICE_API_BASE}${path}`;
 	const headers = {
 		'User-Agent': USER_AGENT,
 		'Content-Type': 'application/json',
 		Accept: 'application/json',
-		Authorization: `Bearer ${LEXWARE_OFFICE_API_KEY}`,
+		Authorization: `Bearer ${key}`,
 	};
 
 	logger.log('Making Lexware Office write request', { url, method });
@@ -107,7 +149,7 @@ export async function makeLexwareOfficeWriteRequest<T>(
 		}
 
 		logger.log('Lexware Office write response', { status: response.status });
-		return { ok: true, data: responseBody as T };
+		return { ok: true; data: responseBody as T };
 	} catch (error) {
 		logger.error('Error making Lexware Office write request', { error });
 		return null;
@@ -117,13 +159,19 @@ export async function makeLexwareOfficeWriteRequest<T>(
 export async function makeLexwareOfficeMultipartRequest<T>(
 	path: string,
 	formData: FormData,
+	apiKey?: string,
 ): Promise<WriteResult<T> | null> {
+	const key = resolveApiKey(apiKey);
+	if (!key) {
+		return null;
+	}
+
 	const url = `${LEXOFFICE_API_BASE}${path}`;
 	// Do NOT set Content-Type — fetch sets it automatically with the multipart boundary
 	const headers = {
 		'User-Agent': USER_AGENT,
 		Accept: 'application/json',
-		Authorization: `Bearer ${LEXWARE_OFFICE_API_KEY}`,
+		Authorization: `Bearer ${key}`,
 	};
 
 	logger.log('Making Lexware Office multipart request', { url });
@@ -144,7 +192,7 @@ export async function makeLexwareOfficeMultipartRequest<T>(
 		}
 
 		logger.log('Lexware Office multipart response', { status: response.status });
-		return { ok: true, data: responseBody as T };
+		return { ok: true; data: responseBody as T };
 	} catch (error) {
 		logger.error('Error making Lexware Office multipart request', { error });
 		return null;
